@@ -121,8 +121,6 @@ The attack payload is constructed to overflow the buffer and overwrite the saved
 ### Output of previous attack
 
 ```shell
-
-
 === DEMO 1: Normal Execution ===
 
 [VULN] Executing memcpy (6 bytes)...
@@ -165,7 +163,7 @@ The attack payload is constructed to overflow the buffer and overwrite the saved
 [GADGET] ROP chain completed. Changed privileged flag: 0x00000000
 ```
 
-Good but not expected
+Different but not expected
 
 ### Analysis
 
