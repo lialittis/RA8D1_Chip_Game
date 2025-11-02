@@ -5,7 +5,7 @@
  *
  * Change Logs:
  * Date           Author            Notes
- * 2025-10-26     Tianchi YU        ROP attack demonstration for educational purposes
+ * 2025-10-26     Tianchi YU        ROP attack demonstration
  */
 
 #include <rtthread.h>
@@ -160,8 +160,7 @@ __attribute__((noinline, naked)) static void gadget_exit2(void)
 /**
  * @brief Vulnerable function with stack buffer overflow
  * 
- * This function intentionally has a buffer overflow vulnerability
- * for educational demonstration of ROP attacks
+ * This function intentionally has a buffer overflow vulnerability of ROP attacks
  */
 __attribute__((noinline, optimize("O1")))
 static void vulnerable_function(const char *input, size_t len)
